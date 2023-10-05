@@ -1,0 +1,39 @@
+import json
+import boto3
+import pandas as pd
+import logging
+
+s3_client = boto3.client('s3')
+sns_client=boto3.client('sns')
+sns_arn = 'arn:aws:sns:ap-south-1:826814825666:bigdata-arrival-sms'
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def lambda_handler(event, context):
+    logger.info("Received event: " + json.dumps(event))
+    
+    try:
+        # Extract bucket name and object key
+        bucket_name = event["Records"][0]["s3"]["bucket"]["name"]
+        s3_file_key = event["Records"][0]["s3"]["object"]["key"]
+        logger.info(f"Bucket: {bucket_name}, Key: {s3_file_key}")
+        
+        # Get the S3 object
+        response = s3_client.get_object(Bucket=bucket_name, Key=s3_file_key)
+        
+        # Read CSV data into a Pandas DataFrame
+        with response['Body'] as file_stream:
+            df_s3_data = pd.read_csv(file_stream, sep=",")
+        
+        logger.info("DataFrame loaded successfully:")
+        logger.info(df_s3_data.head())
+        
+        # Perform further processing on df_s3_data if needed
+        
+        message = "input s3 file is processed sucessfully"
+        response=sns_client.publish(TargetArn=sns_arn,Message=message,MessageStructure='text')
+        
+        
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
